@@ -1,0 +1,122 @@
+% Procesamiento en diseño ingenieril
+clear all;close all;clc; 
+% Importar o ingresar una foto/imagen
+GetDir  = uigetfile('*.jpg;*.png;*.gif');
+%%
+tStart=tic;
+img_original(:,:,:) = imread(GetDir);
+img_original_R = img_original(:,:,1); 
+img_original_G = img_original(:,:,2);
+img_original_B = img_original(:,:,3);
+img_R = img_original_R;%extraer caracteristicas de dimensión
+img_G = img_original_G;
+img_B = img_original_B;
+img_R(xy) = 255;
+img_G(xy) = 255;
+img_B(xy) = 255;
+img_sinfondo(:,:,1) = img_R;
+img_sinfondo(:,:,2) = img_G;
+img_sinfondo(:,:,3) = img_B;
+%% Escala de grises, filtro mediana & Binarización
+EscalaGris=rgb2gray(img_sinfondo);
+FiltroMediana= medfilt2(EscalaGris);
+Binarizacion = imbinarize(FiltroMediana,0.9);
+Binarizada=not(Binarizacion);
+%% Eliminar filas y ceros con valor = 0
+FilasBinariziada=find(sum(Binarizada,2)==0); %Filas de puros ceros/unos
+Binarizada(FilasBinariziada,:)=[];
+ColumnasBinarizada=find(sum(Binarizada,1)==0); %Columnas de puros ceros
+Binarizada(:,ColumnasBinarizada)=[];
+
+%% Volver par la matriz
+B=Binarizada;
+[FilaB,ColumnaB]=size(B);
+if  rem(FilaB,2)==0
+    B;%NO HACER NADA
+else
+    B(FilaB+1,ColumnaB)=0;
+end
+if  rem(ColumnaB,2)==0
+    B;%NO HACER NADA
+else
+    B(FilaB,ColumnaB+1)=0;
+end
+%% Separar la matriz en regiones de interés y extraer region de interés
+RegionInteres=B;
+[FilasRegionInteres,ColumnaRegionInteres]=size(RegionInteres);
+CortarCuello=RegionInteres(Cuello:FilasRegionInteres,1:ColumnaRegionInteres);
+[FilasCuello,ColumnasCuello]=size(CortarCuello);
+RegionSuperior=CortarCuello(1:FilasCuello/2,1:ColumnasCuello);
+[FilaRegionSuperior,ColumnasRegionSuperior]=size(RegionSuperior);
+MediaRegionSuperiorSinCuello=mean(RegionSuperior,2);
+Hombros=find(MediaRegionSuperiorSinCuello>=0.987);
+CortarSobreHombros=CortarCuello(1:Hombros,1:ColumnaRegionInteres);
+%% Separar Matriz por columnas para obtener los dos hombros
+[FilasHombros,ColumnasHombros]=size(CortarSobreHombros);
+HombroIzquierdo=CortarSobreHombros(1:FilasHombros,1:ColumnasHombros/2);
+HombroDerecho=CortarSobreHombros(1:FilasHombros,ColumnasHombros/2+1:ColumnasHombros);
+EspejoHombroDerecho = fliplr(HombroDerecho); 
+%% TAMAÑOS DE HOMBRO IZQUIERO Y HOMBRO DERECHO PARA IGUALAR
+[FilasHombroIzquierdo,ColumnasHombroIzquierdo]=size(HombroIzquierdo);       %TAMAÑO MATRIZ HOMBRO IZQUIERDO
+[FilasHombroDerecho,ColumnasHombroDerecho]=size(EspejoHombroDerecho);       %TAMAÑO MATRIZ HOMBRO DERECHO
+DiferenciaFilasHombros=abs(FilasHombroIzquierdo-FilasHombroDerecho);     %DIFERENCIA DE FILAS/COLUMNAS
+DiferenciaColumnasHombros=abs(ColumnasHombroIzquierdo-ColumnasHombroDerecho);       %DIFERENCIA DE FILAS/COLUMNAS
+if FilasHombroIzquierdo>~FilasHombroDerecho;
+    EspejoHombroDerecho(FilasHombroDerecho+DiferenciaFilasHombros,ColumnasHombroDerecho)=0; %AÑADIR VECTOR/RES DE 0 A LAS FILAS DE TAMAÑO DIF1FILAS
+elseif FilasHombroIzquierdo<~FilasHombroDerecho;
+    HombroIzquierdo(FilasHombroIzquierdo+DiferenciaFilasHombros,ColumnasHombroIzquierdo)=0;
+    if ColumnasHombroIzquierdo>~ColumnasHombroDerecho;
+    EspejoHombroDerecho(ColumnasHombroDerecho+DiferenciaColumnasHombros,FilasHombroDerecho)=0; %AÑADIR VECTOR/RES DE 0 A LAS FILAS DE TAMAÑO DIF1COL
+elseif ColumnasHombroIzquierdo<~ColumnasHombroDerecho;
+    HombroIzquierdo(ColumnasHombroIzquierdo+DiferenciaColumnasHombros,FilasHombroIzquierdo)=0; %AÑADIR VECTOR/RES DE 0 A LAS FILAS DE TAMAÑO DIF1COL
+    end
+end
+[FilasHombroIzquierdo,ColumnasHombroIzquierdo]=size(HombroIzquierdo);       %TAMAÑO MATRIZ HOMBRO IZQUIERDO
+[FilasHombroDerecho,ColumnasHombroDerecho]=size(EspejoHombroDerecho);       %TAMAÑO MATRIZ HOMBRO DERECHO
+RestaDeHombros=HombroIzquierdo-EspejoHombroDerecho;
+%% FiguraDiscretaIzquierdo
+MinimoHombroIzquierdo=[];
+for FilasMinimoHIzquierdo=1:ColumnasHombroIzquierdo;
+SiluetaHombroIzquierdo=find(HombroIzquierdo(:,FilasMinimoHIzquierdo:ColumnasHombroIzquierdo)==1);
+N=FilasMinimoHIzquierdo-1;
+for FilasMinimoHIzquierdo1=1:1;
+    MinimoHombroIzquierdo(1,FilasMinimoHIzquierdo:ColumnasHombroIzquierdo)=min(SiluetaHombroIzquierdo);
+end
+end
+UnosEnFilasIz=find(MinimoHombroIzquierdo==1);
+HombroIzquierdoDiscreto=(MinimoHombroIzquierdo(rot90(1:UnosEnFilasIz)));
+%% FiguraDiscretaDerecho
+MinimoHombroDerecho=[];
+for FilasMinimoHDerecho=1:ColumnasHombroDerecho;
+SiluetaHombroDerecho=find(EspejoHombroDerecho(:,FilasMinimoHDerecho:ColumnasHombroDerecho)==1);
+N=FilasMinimoHDerecho-1;
+for FilasMinimoHDerecho1=1:1;
+    MinimoHombroDerecho(1,FilasMinimoHDerecho:ColumnasHombroDerecho)=min(SiluetaHombroDerecho);
+end
+end
+UnosEnFilasD=find(MinimoHombroDerecho==1);
+HombroDerechoDiscreto=(MinimoHombroDerecho(rot90(1:UnosEnFilasD)));
+%% IgualarTamañoFigurasDiscretas
+[FilasDiscretaIzquierda,ColumnasDiscretaIzquierda]=size(HombroIzquierdoDiscreto);       %TAMAÑO MATRIZ 
+[FilasDiscretaDerecha,ColumnasDiscretaDerecha]=size(HombroDerechoDiscreto); %TAMAÑO MATRIZ 
+DiferenciaColumnasDiscretas=abs(ColumnasDiscretaIzquierda-ColumnasDiscretaDerecha);
+if ColumnasDiscretaIzquierda<~ColumnasDiscretaDerecha;
+    HombroDerechoDiscreto(FilasDiscretaDerecha,ColumnasDiscretaDerecha+DiferenciaColumnasDiscretas)=0;
+elseif ColumnasDiscretaIzquierda>~ColumnasDiscretaDerecha;
+    HombroIzquierdoDiscreto(FilasDiscretaIzquierda,ColumnasDiscretaIzquierda+DiferenciaColumnasDiscretas)=0;
+end
+%% RestaFigurasDiscretas
+DiferenciaFinal=HombroIzquierdoDiscreto-HombroDerechoDiscreto;
+[FilasDiferencia,ColumnasDiferencia]=size(DiferenciaFinal);
+DifColDis=DiferenciaColumnasDiscretas;
+ColDif=ColumnasDiferencia;
+SuprimirDiferencia=(ColDif-DifColDis)-25;
+DiferenciaFinal(:,SuprimirDiferencia:ColDif)=[]; %
+%% Conversión
+Diferencia=abs(DiferenciaFinal);
+ValMaxPixel=max(Diferencia);
+Resolucion=72;
+Pulgada=0.393701;
+DifPulgadas=ValMaxPixel/Resolucion;
+DifCM=DifPulgadas/Pulgada;
+tEnd=toc(tStart);
